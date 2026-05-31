@@ -114,7 +114,6 @@ vim.diagnostic.config({
 	},
 })
 
---vim.g.python3_host_prog = "/home/peter/Projects/TestUV/.venv/bin/python"
 
 -- Highlight yanked text briefly
 vim.api.nvim_create_autocmd("TextYankPost", {

@@ -93,7 +93,7 @@ DAP UI automatically opens when debugging starts and closes when debugging ends.
 
 ### Python Environment
 
-Python host program is explicitly set in init.lua:57 to `/home/peter/venv/bin/python`. DAP configuration will prefer project-local venvs when debugging.
+DAP configuration prefers project-local venvs when debugging (checks `.venv/` then `venv/`).
 
 ### Database Connections
 

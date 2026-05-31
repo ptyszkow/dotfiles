@@ -16,7 +16,7 @@ services:
     #   - 1455:1455
     stdin_open: true
     tty: true
-    working_dir: /home/peter/Projects
+    working_dir: /home/dev/Projects
     devices:
       - /dev/snd
     environment:
@@ -34,5 +34,5 @@ services:
       - ${HOME}/.claude.json:/home/dev/.claude.json
       - ${HOME}/.config/opencode:/home/dev/.config/opencode
       - ${HOME}/.local/share/opencode:/home/dev/.local/share/opencode
-      - ${HOME}/Projects:/home/peter/Projects
+      - ${HOME}/Projects:/home/dev/Projects
     command: ["bash"]
