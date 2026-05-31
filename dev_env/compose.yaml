@@ -1,0 +1,38 @@
+services:
+  claude:
+    container_name: dev
+    image: localhost/claude-dev:latest
+    build:
+      context: .
+      dockerfile: Containerfile
+      args:
+        UID: "1000"
+        GID: "1000"
+        USERNAME: dev
+    userns_mode: keep-id
+    security_opt:
+      - label=disable
+    ports:
+    #   - 1455:1455
+    stdin_open: true
+    tty: true
+    working_dir: /home/peter/Projects
+    devices:
+      - /dev/snd
+    environment:
+      HOME: /home/dev
+      XDG_CONFIG_HOME: /home/dev/.config
+      XDG_DATA_HOME: /home/dev/.local/share
+      XDG_RUNTIME_DIR: /run/user/1000
+      PULSE_SERVER: unix:/run/user/1000/pulse/native
+      CLAUDE_CONFIG_DIR: /home/dev/.claude
+    volumes:
+      - /run/user/1000/pipewire-0:/run/user/1000/pipewire-0
+      - /run/user/1000/pulse/native:/run/user/1000/pulse/native
+      - ${HOME}/.config/pulse/cookie:/home/dev/.config/pulse/cookie:ro
+      - ${HOME}/.claude:/home/dev/.claude
+      - ${HOME}/.claude.json:/home/dev/.claude.json
+      - ${HOME}/.config/opencode:/home/dev/.config/opencode
+      - ${HOME}/.local/share/opencode:/home/dev/.local/share/opencode
+      - ${HOME}/Projects:/home/peter/Projects
+    command: ["bash"]

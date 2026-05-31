@@ -1,0 +1,90 @@
+# =============================================================================
+# Claude Dev container — Arch Linux based development environment
+# Provides: Neovim + LSPs, multiple language toolchains, Claude Code CLI,
+#           and VOICE/AUDIO passthrough (PipeWire/PulseAudio) from the host.
+# =============================================================================
+
+FROM docker.io/library/archlinux:latest
+
+RUN pacman -Syu --noconfirm --needed \
+      base-devel git curl wget unzip \
+      sudo openssh which less man-db \
+      ripgrep fd fzf bat \
+      python uv \
+      nodejs npm \
+      rustup \
+      go \
+      dotnet-sdk \
+      clang lldb llvm \
+      lua luarocks lua-language-server \
+      neovim tree-sitter tree-sitter-cli \
+      pipewire pipewire-pulse pulseaudio-alsa alsa-utils \
+      sox ffmpeg \
+      xdg-utils \
+      zellij \
+    && pacman -Scc --noconfirm
+
+ARG USERNAME=dev
+ARG UID=1000
+ARG GID=1000
+
+RUN groupadd -g ${GID} ${USERNAME} \
+    # Create the user and add to wheel (sudo), plus `audio` + `video` groups.
+    # ===== VOICE ENABLER: `audio` group membership is required for the user
+    # inside the container to access /dev/snd devices mounted from the host.
+    && useradd -m -u ${UID} -g ${GID} -G wheel,audio,video -s /bin/bash ${USERNAME} \
+    # Pre-create ~/.local/bin so the PATH entry below is valid
+    && mkdir -p /home/${USERNAME}/.local/bin \
+    && chown -R ${UID}:${GID} /home/${USERNAME} \
+    # Passwordless sudo — convenient inside a throwaway dev container
+    && echo "${USERNAME} ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers
+
+# Drop root for the remaining steps so user-scoped tools install under $HOME
+USER ${USERNAME}
+WORKDIR /home/${USERNAME}
+
+RUN rustup default stable \
+    && rustup component add rust-analyzer rust-src
+
+# -----------------------------------------------------------------------------
+# 4. Node-based LSPs + Claude Code CLI (installed globally via npm)
+# -----------------------------------------------------------------------------
+# `sudo` because global npm installs write to /usr/lib/node_modules (root-owned).
+# Note: @anthropic-ai/claude-code is the CLI whose voice mode consumes the
+# audio stack configured above.
+RUN sudo npm install -g \
+      pyright \
+      typescript typescript-language-server \
+      vscode-langservers-extracted \
+      bash-language-server
+
+# Installed on their own lines so a failure is loud rather than silently
+# dropped from a multi-package install.
+RUN sudo npm install -g @anthropic-ai/claude-code
+RUN sudo npm install -g opencode-ai
+
+
+# -----------------------------------------------------------------------------
+# 5. C# LSP (Roslyn-based) — installed as a global dotnet tool under $HOME
+# -----------------------------------------------------------------------------
+ENV DOTNET_CLI_TELEMETRY_OPTOUT=1 \
+    # Prepend tool dirs so dotnet tools, user scripts and cargo binaries are on PATH
+    PATH=/home/${USERNAME}/.dotnet/tools:/home/${USERNAME}/.local/bin:/home/${USERNAME}/.cargo/bin:/usr/local/bin:/usr/bin:/bin
+
+RUN dotnet tool install --global csharp-ls
+
+RUN git clone --depth=1 https://github.com/ptyszkow/nvim.git \
+      ~/.config/nvim \
+    && nvim --headless "+qa" || true
+
+ENV EDITOR=nvim \
+    VISUAL=nvim
+
+CMD ["bash"]
+
+# =============================================================================
+# Voice/audio note — the runtime side of the VOICE ENABLER lives in
+# compose.yaml: it mounts /dev/snd, the host's PipeWire & PulseAudio sockets,
+# and the PulseAudio cookie. The packages installed above are only useful
+# when those mounts are present.
+# =============================================================================

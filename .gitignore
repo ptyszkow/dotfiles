@@ -1,0 +1,5 @@
+.env
+.env.*
+!.env.example
+settings.local.json
+notes.md

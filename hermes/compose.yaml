@@ -1,0 +1,10 @@
+services:
+  hermes:
+    image: nousresearch/hermes-agent
+    container_name: hermes
+    restart: unless-stopped
+    command: gateway run
+    volumes:
+      - ~/.hermes:/opt/data
+    ports:
+      - "8642:8642"

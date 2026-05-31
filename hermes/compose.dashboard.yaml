@@ -1,0 +1,15 @@
+services:
+  hermes:
+    image: nousresearch/hermes-agent
+    container_name: hermes
+    restart: unless-stopped
+    command: gateway run
+    userns_mode: "keep-id:uid=10000,gid=10000"
+    volumes:
+      - ~/.hermes:/opt/data
+      - ~/Projects:/opt/projects
+    ports:
+      - "8642:8642"
+      - "9119:9119"
+    environment:
+      HERMES_DASHBOARD: "1"
