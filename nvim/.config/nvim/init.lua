@@ -49,6 +49,7 @@ vim.opt.splitright = true
 -- Performance
 vim.opt.updatetime = 250 -- Faster completion
 vim.opt.timeoutlen = 500 -- Shorter mapped sequence wait
+vim.opt.autoread = true
 -- Searching
 vim.opt.ignorecase = true
 vim.opt.smartcase = true
@@ -65,7 +66,14 @@ vim.keymap.set("n", "<leader>ui", ":update<CR> :source<CR>", { desc = "Update an
 vim.keymap.set("n", "<Esc>", "<cmd>nohlsearch<CR>")
 
 -- Exit terminal mode
-vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" })
+-- vim.keymap.set("t", "<Esc><Esc>", "<C-\\><C-n>", { desc = "Exit terminal mode" })
+vim.keymap.set("t", "<C-W><C-H>", "<C-\\><C-n><C-w><C-h>", { desc = "Exit terminal mode and move to left window" })
+vim.keymap.set("t", "<C-W><C-L>", "<C-\\><C-n><C-w><C-l>", { desc = "Exit terminal mode and move to right window" })
+
+vim.api.nvim_create_user_command("Claude", function()
+  vim.cmd("terminal claude")
+  vim.cmd("startinsert")
+end, { desc = "Open Claude in terminal" })
 
 -- Window navigation with Ctrl+hjkl
 vim.keymap.set("n", "<C-h>", "<C-w><C-h>", { desc = "Move focus to the left window" })

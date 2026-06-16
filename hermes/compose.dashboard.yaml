@@ -1,10 +1,10 @@
 services:
   hermes:
-    image: nousresearch/hermes-agent
+    image: docker.io/nousresearch/hermes-agent
     container_name: hermes
     restart: unless-stopped
     command: gateway run
-    userns_mode: "keep-id:uid=10000,gid=10000"
+    userns_mode: "keep-id"
     volumes:
       - ~/.hermes:/opt/data
       - ~/Projects:/opt/projects

@@ -5,7 +5,6 @@
 # Falls back to $WALLPAPER_DIR for backward compatibility.
 
 set -euo pipefail
-WALLPAPER_DIRS="$HOME/backup/wallpapers_grok/wallpapers:$HOME/Projects/wallpaper"
 WALLPAPER_DIRS="${WALLPAPER_DIRS:-${WALLPAPER_DIR:-$HOME/Projects/wallpaper}}"
 INTERVAL="${INTERVAL:-60}"
 TRANSITION="${TRANSITION:-fade}"
