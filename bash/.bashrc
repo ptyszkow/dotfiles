@@ -14,10 +14,15 @@ eval "$(starship init bash)"
 [[ -f ~/.env ]] && source ~/.env
 
 export PATH="$HOME/.local/bin:$PATH"
+export PATH="$HOME/.local/share/gem/ruby/3.4.0/bin:$PATH"
 # >>> grok installer >>>
 export PATH="$HOME/.grok/bin:$PATH"
 [[ -r "$HOME/.grok/completions/bash/grok.bash" ]] && source "$HOME/.grok/completions/bash/grok.bash"
 # <<< grok installer <<<
-alias rai="podman exec -itu dev dev-ai bash"
-
+alias scai='podman container start dev-ai'
+alias rai='podman exec -itu dev dev-ai bash'
+alias cbash='podman exec -itu dev dev-ai bash'
+alias cgrok='podman exec -itu dev dev-ai grok'
+alias ccodex='podman exec -itu dev dev-ai codex'
+alias cclaude='podman exec -itu dev dev-ai claude'
 fastfetch
