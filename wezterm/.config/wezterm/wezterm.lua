@@ -4,22 +4,60 @@ local config = wezterm.config_builder()
 
 math.randomseed(os.time())
 
--- appearance: minimal chrome, cool dark palette
-config.window_background_opacity = 0.855
+-- appearance: cinematic midnight palette with restrained neon accents
+config.color_scheme = "Tokyo Night"
+config.colors = {
+	background = "#0b1020",
+	foreground = "#c0caf5",
+	cursor_bg = "#7dcfff",
+	cursor_border = "#7dcfff",
+	cursor_fg = "#0b1020",
+	selection_bg = "#283457",
+	selection_fg = "#c0caf5",
+	tab_bar = {
+		background = "#080d19",
+		active_tab = { bg_color = "#1a2440", fg_color = "#c0caf5" },
+		inactive_tab = { bg_color = "#0f1629", fg_color = "#737da1" },
+		inactive_tab_hover = { bg_color = "#1e2842", fg_color = "#c0caf5" },
+		new_tab = { bg_color = "#080d19", fg_color = "#737da1" },
+		new_tab_hover = { bg_color = "#1e2842", fg_color = "#7dcfff" },
+	},
+}
+config.window_background_opacity = 1.0
 config.macos_window_background_blur = 20
 config.window_decorations = "NONE"
 config.enable_tab_bar = true
-config.status_update_interval = 200
+config.use_fancy_tab_bar = true
+config.show_new_tab_button_in_tab_bar = false
+config.status_update_interval = 1000
+config.window_frame = {
+	font = wezterm.font("JetBrainsMono Nerd Font"),
+	font_size = 11.0,
+	active_titlebar_bg = "#080d19",
+	inactive_titlebar_bg = "#080d19",
+}
 config.window_padding = {
-	left = 15,
-	right = 15,
-	top = 15,
-	bottom = 15,
+	left = 18,
+	right = 18,
+	top = 14,
+	bottom = 14,
+}
+config.inactive_pane_hsb = {
+	saturation = 0.85,
+	brightness = 0.72,
 }
 
 -- text
 config.font = wezterm.font("JetBrainsMono Nerd Font")
 config.font_size = 11.0
+config.line_height = 1.20
+
+-- command palette: compact, readable, and matched to the terminal chrome
+config.command_palette_bg_color = "#0f1629"
+config.command_palette_fg_color = "#c0caf5"
+config.command_palette_font = wezterm.font("JetBrainsMono Nerd Font")
+config.command_palette_font_size = 11.0
+config.command_palette_rows = 14
 
 -- cursor
 config.default_cursor_style = "SteadyBar"
@@ -183,13 +221,13 @@ local function background_layers(path)
 			vertical_align = "Middle",
 			repeat_x = "NoRepeat",
 			repeat_y = "NoRepeat",
-			hsb = { hue = 1.0, saturation = 0.85, brightness = 0.24 },
+			hsb = { hue = 1.0, saturation = 0.95, brightness = 0.55 },
 		},
 		{
-			source = { Color = "#0d1117" },
+			source = { Color = "#07090f" },
 			width = "100%",
 			height = "100%",
-			opacity = 0.55,
+			opacity = 0.32,
 		},
 	}
 end
@@ -224,6 +262,35 @@ local function apply_tab_wallpaper(window)
 	window:set_config_overrides(overrides)
 end
 
+local function current_folder(pane)
+	local uri = pane:get_current_working_dir()
+	local path = uri and (uri.file_path or tostring(uri)) or ""
+	path = path:gsub("^file://[^/]*", ""):gsub("/+$", "")
+	return path:match("([^/]+)$") or "~"
+end
+
+local function render_status(window, pane)
+	if wezterm.GLOBAL.color_hint then
+		window:set_right_status(wezterm.format({
+			{ Foreground = { Color = "#7dcfff" } },
+			{ Text = COLOR_HINT },
+		}))
+		return
+	end
+
+	local elements = {
+		{ Foreground = { Color = "#737da1" } },
+		{ Text = "  󰉋  " .. current_folder(pane) .. "  " },
+	}
+	local mode = window:active_key_table()
+	if mode then
+		table.insert(elements, { Foreground = { Color = "#bb9af7" } })
+		table.insert(elements, { Attribute = { Intensity = "Bold" } })
+		table.insert(elements, { Text = "  " .. mode:upper():gsub("_", " ") .. "  " })
+	end
+	window:set_right_status(wezterm.format(elements))
+end
+
 local function paint_tab_title(tab, title)
 	local current = tab:get_title() or ""
 	if current ~= title then
@@ -235,7 +302,7 @@ local function paint_tab_title(tab, title)
 	tab:set_title(title)
 end
 
-local function apply_tab_color(window, spec)
+local function apply_tab_color(window, pane, spec)
 	local tab = window:active_tab()
 	if not tab then
 		return
@@ -248,7 +315,7 @@ local function apply_tab_color(window, spec)
 	local visible = decode_title(tab:get_title())
 	paint_tab_title(tab, encode_title(visible, spec))
 	wezterm.GLOBAL.color_hint = false
-	window:set_right_status("")
+	render_status(window, pane)
 end
 
 local function enter_tab_color(window, pane)
@@ -263,42 +330,46 @@ local function enter_tab_color(window, pane)
 		pane
 	)
 	wezterm.GLOBAL.color_hint = true
-	window:set_right_status(wezterm.format({
-		{ Foreground = { Color = "#d0d0d0" } },
-		{ Text = COLOR_HINT },
-	}))
+	render_status(window, pane)
 end
 
-wezterm.on("update-status", function(window, _pane)
+wezterm.on("update-status", function(window, pane)
 	apply_tab_wallpaper(window)
 	if wezterm.GLOBAL.color_hint and window:active_key_table() ~= "tab_color" then
 		wezterm.GLOBAL.color_hint = false
-		window:set_right_status("")
 	end
+	render_status(window, pane)
 end)
 
-wezterm.on("format-tab-title", function(tab, _tabs, _panes, _config, _hover, max_width)
+wezterm.on("format-tab-title", function(tab, _tabs, _panes, _config, hover, max_width)
 	local visible, spec = decode_title(tab.tab_title)
 	local title = visible
 	if not title or title == "" then
 		title = (tab.active_pane and tab.active_pane.title) or ""
 	end
-	local limit = tonumber(max_width) or 16
-	title = wezterm.truncate_right(title, math.max(1, limit - 2))
-	if not spec then
-		return " " .. title .. " "
+	local limit = tonumber(max_width) or 32
+	local index = tostring(tab.tab_index + 1)
+	local chrome_width = 9 + #index
+	title = wezterm.truncate_right(title, math.max(1, limit - chrome_width))
+	local background = tab.is_active and "#1a2440" or "#0f1629"
+	if hover and not tab.is_active then
+		background = "#1e2842"
 	end
-	-- Fancy tab bar takes the whole tab color from the first cell.
+	local foreground = tab.is_active and "#c0caf5" or "#737da1"
+	local accent = spec and spec.bg or (tab.is_active and "#7dcfff" or "#39436a")
 	return {
-		{ Background = { Color = spec.bg } },
-		{ Foreground = { Color = spec.fg } },
-		{ Text = " " .. title .. " " },
+		{ Background = { Color = background } },
+		{ Foreground = { Color = accent } },
+		{ Text = "  ●  " },
+		{ Foreground = { Color = foreground } },
+		{ Attribute = { Intensity = tab.is_active and "Bold" or "Normal" } },
+		{ Text = index .. " " .. title .. "   " },
 	}
 end)
 
 local function color_action(spec)
-	return wezterm.action_callback(function(window, _pane)
-		apply_tab_color(window, spec)
+	return wezterm.action_callback(function(window, pane)
+		apply_tab_color(window, pane, spec)
 	end)
 end
 
