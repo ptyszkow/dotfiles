@@ -4,7 +4,11 @@ local config = wezterm.config_builder()
 
 math.randomseed(os.time())
 
--- appearance: cinematic midnight palette with restrained neon accents
+-- Appearance -----------------------------------------------------------------
+
+local FONT = wezterm.font("JetBrainsMono Nerd Font")
+local FONT_SIZE = 11.0
+
 config.color_scheme = "Tokyo Night"
 config.colors = {
 	background = "#0b1020",
@@ -19,117 +23,40 @@ config.colors = {
 		active_tab = { bg_color = "#1a2440", fg_color = "#c0caf5" },
 		inactive_tab = { bg_color = "#0f1629", fg_color = "#737da1" },
 		inactive_tab_hover = { bg_color = "#1e2842", fg_color = "#c0caf5" },
-		new_tab = { bg_color = "#080d19", fg_color = "#737da1" },
-		new_tab_hover = { bg_color = "#1e2842", fg_color = "#7dcfff" },
 	},
 }
-config.window_background_opacity = 1.0
-config.macos_window_background_blur = 20
+
+config.font = FONT
+config.font_size = FONT_SIZE
+config.line_height = 1.20
+config.default_cursor_style = "SteadyBar"
+
 config.window_decorations = "NONE"
-config.enable_tab_bar = true
-config.use_fancy_tab_bar = true
 config.show_new_tab_button_in_tab_bar = false
-config.status_update_interval = 1000
 config.window_frame = {
-	font = wezterm.font("JetBrainsMono Nerd Font"),
-	font_size = 11.0,
+	font = FONT,
+	font_size = FONT_SIZE,
 	active_titlebar_bg = "#080d19",
 	inactive_titlebar_bg = "#080d19",
 }
-config.window_padding = {
-	left = 18,
-	right = 18,
-	top = 14,
-	bottom = 14,
-}
-config.inactive_pane_hsb = {
-	saturation = 0.85,
-	brightness = 0.72,
-}
+config.window_padding = { left = 18, right = 18, top = 14, bottom = 14 }
+config.inactive_pane_hsb = { saturation = 0.85, brightness = 0.72 }
 
--- text
-config.font = wezterm.font("JetBrainsMono Nerd Font")
-config.font_size = 11.0
-config.line_height = 1.20
-
--- command palette: compact, readable, and matched to the terminal chrome
 config.command_palette_bg_color = "#0f1629"
 config.command_palette_fg_color = "#c0caf5"
-config.command_palette_font = wezterm.font("JetBrainsMono Nerd Font")
-config.command_palette_font_size = 11.0
+config.command_palette_font_size = FONT_SIZE
 config.command_palette_rows = 14
 
--- cursor
-config.default_cursor_style = "SteadyBar"
-config.cursor_blink_rate = 0
+-- Per-tab wallpapers ---------------------------------------------------------
+-- Each tab gets a random image from WALLPAPER_DIRS (searched recursively).
 
 local WALLPAPER_DIRS = {
 	wezterm.home_dir .. "/Projects/Wallpapers",
 	wezterm.home_dir .. "/Projects/Wallpaper",
 }
 
-local IMAGE_PATTERNS = {
-	"/*.jpg",
-	"/*.jpeg",
-	"/*.png",
-	"/*.webp",
-	"/*.gif",
-	"/*.bmp",
-	"/*/*.jpg",
-	"/*/*.jpeg",
-	"/*/*.png",
-	"/*/*.webp",
-	"/*/*.gif",
-	"/*/*.bmp",
-}
-
--- Basic tab colors. Digit is Ctrl+T then that key. Letter is Ctrl+T, c, then the letter.
-local TAB_COLORS = {
-	{ key = "r", digit = "1", name = "red", bg = "#d64545", fg = "#fff5f5" },
-	{ key = "g", digit = "2", name = "green", bg = "#2f9e6b", fg = "#f3fff8" },
-	{ key = "b", digit = "3", name = "blue", bg = "#3b6fe0", fg = "#f4f7ff" },
-	{ key = "v", digit = "4", name = "violet", bg = "#b05ae1", fg = "#1a1020" },
-	{ key = "y", digit = "5", name = "yellow", bg = "#f0d040", fg = "#1a1408" },
-	{ key = "o", digit = "6", name = "orange", bg = "#ff7a1a", fg = "#2a1004" },
-	{ key = "c", digit = "7", name = "cyan", bg = "#2ec4d6", fg = "#042026" },
-	{ key = "p", digit = "8", name = "pink", bg = "#ee6fa8", fg = "#2a1020" },
-	{ key = "w", digit = "9", name = "white", bg = "#f4f1ea", fg = "#1a1a1a" },
-	{ key = "m", digit = "0", name = "mint", bg = "#6ed9a0", fg = "#042214" },
-}
-
-local TITLE_MARK = "\x1e"
-
-local function encode_title(visible, spec)
-	visible = visible or ""
-	if not spec then
-		return visible
-	end
-	return TITLE_MARK .. spec.bg .. TITLE_MARK .. spec.fg .. TITLE_MARK .. visible
-end
-
-local function decode_title(raw)
-	raw = raw or ""
-	if raw:sub(1, 1) ~= TITLE_MARK then
-		return raw, nil
-	end
-	local first = raw:find(TITLE_MARK, 2, true)
-	local second = first and raw:find(TITLE_MARK, first + 1, true)
-	if not first or not second then
-		return raw, nil
-	end
-	local bg = raw:sub(2, first - 1)
-	local fg = raw:sub(first + 1, second - 1)
-	if bg == "" or fg == "" then
-		return raw, nil
-	end
-	return raw:sub(second + 1), { bg = bg, fg = fg }
-end
-
-local color_hint_parts = {}
-for _, spec in ipairs(TAB_COLORS) do
-	table.insert(color_hint_parts, spec.digit .. spec.key)
-end
-local COLOR_HINT = " " .. table.concat(color_hint_parts, " ") .. "   n random   x clear "
+local WALLPAPER_HSB = { hue = 1.0, saturation = 0.95, brightness = 0.55 }
+local WALLPAPER_DIM = 0.32
 
 local function is_image(path)
 	local lower = path:lower()
@@ -140,60 +67,32 @@ local function is_image(path)
 		or lower:match("%.bmp$")
 end
 
-local function collect_from_dir(dir, acc)
+local function collect_images(dir, files)
 	local ok, entries = pcall(wezterm.read_dir, dir)
 	if not ok or not entries then
-		return acc
+		return
 	end
 	for _, path in ipairs(entries) do
 		if is_image(path) then
-			table.insert(acc, path)
+			table.insert(files, path)
 		else
-			collect_from_dir(path, acc)
+			collect_images(path, files)
 		end
 	end
-	return acc
 end
 
-local function collect_wallpapers()
-	local files = {}
-	local seen = {}
-	for _, dir in ipairs(WALLPAPER_DIRS) do
-		for _, pattern in ipairs(IMAGE_PATTERNS) do
-			local ok, matches = pcall(wezterm.glob, dir .. pattern)
-			if ok and matches then
-				for _, path in ipairs(matches) do
-					if not seen[path] then
-						seen[path] = true
-						table.insert(files, path)
-					end
-				end
-			end
-		end
-		collect_from_dir(dir, files)
-	end
-	local unique = {}
-	seen = {}
-	for _, path in ipairs(files) do
-		if not seen[path] then
-			seen[path] = true
-			table.insert(unique, path)
-		end
-	end
-	return unique
+local WALLPAPERS = {}
+for _, dir in ipairs(WALLPAPER_DIRS) do
+	collect_images(dir, WALLPAPERS)
 end
 
-local WALLPAPERS = collect_wallpapers()
-
+-- Pick a random wallpaper, avoiding an immediate repeat when possible.
 local function pick_wallpaper()
-	if #WALLPAPERS == 0 then
-		return nil
-	end
 	local last = wezterm.GLOBAL.last_wallpaper
 	local path
 	for _ = 1, 8 do
 		path = WALLPAPERS[math.random(#WALLPAPERS)]
-		if path ~= last or #WALLPAPERS == 1 then
+		if path ~= last then
 			break
 		end
 	end
@@ -221,13 +120,13 @@ local function background_layers(path)
 			vertical_align = "Middle",
 			repeat_x = "NoRepeat",
 			repeat_y = "NoRepeat",
-			hsb = { hue = 1.0, saturation = 0.95, brightness = 0.55 },
+			hsb = WALLPAPER_HSB,
 		},
 		{
 			source = { Color = "#07090f" },
 			width = "100%",
 			height = "100%",
-			opacity = 0.32,
+			opacity = WALLPAPER_DIM,
 		},
 	}
 end
@@ -241,26 +140,75 @@ local function apply_tab_wallpaper(window)
 		return
 	end
 	local path = wallpaper_for_tab(tab:tab_id())
-	if not path then
-		return
-	end
 	local overrides = window:get_config_overrides() or {}
-	local layers = background_layers(path)
 	local current = overrides.background
-	local current_path = current and current[1] and current[1].source and current[1].source.File
-	local current_brightness = current and current[1] and current[1].hsb and current[1].hsb.brightness
-	local current_overlay = current and current[2] and current[2].opacity
+	-- Skip when unchanged: set_config_overrides triggers a full config reload.
 	if
-		current_path == path
-		and current_brightness == layers[1].hsb.brightness
-		and current_overlay == layers[2].opacity
+		current
+		and current[1].source.File == path
+		and current[1].hsb.brightness == WALLPAPER_HSB.brightness
+		and current[2].opacity == WALLPAPER_DIM
 	then
 		return
 	end
-	overrides.background = layers
-	overrides.window_background_opacity = 1.0
+	overrides.background = background_layers(path)
 	window:set_config_overrides(overrides)
 end
+
+-- Tab colors -----------------------------------------------------------------
+-- The chosen color is stored inside the tab title as MARK .. bg .. MARK .. title,
+-- so it survives renames and needs no extra state.
+
+local TAB_COLORS = {
+	{ key = "r", digit = "1", bg = "#d64545" }, -- red
+	{ key = "g", digit = "2", bg = "#2f9e6b" }, -- green
+	{ key = "b", digit = "3", bg = "#3b6fe0" }, -- blue
+	{ key = "v", digit = "4", bg = "#b05ae1" }, -- violet
+	{ key = "y", digit = "5", bg = "#f0d040" }, -- yellow
+	{ key = "o", digit = "6", bg = "#ff7a1a" }, -- orange
+	{ key = "c", digit = "7", bg = "#2ec4d6" }, -- cyan
+	{ key = "p", digit = "8", bg = "#ee6fa8" }, -- pink
+	{ key = "w", digit = "9", bg = "#f4f1ea" }, -- white
+	{ key = "m", digit = "0", bg = "#6ed9a0" }, -- mint
+}
+
+local TITLE_MARK = "\x1e"
+
+local function encode_title(visible, spec)
+	visible = visible or ""
+	if not spec then
+		return visible
+	end
+	return TITLE_MARK .. spec.bg .. TITLE_MARK .. visible
+end
+
+local function decode_title(raw)
+	raw = raw or ""
+	if raw:sub(1, 1) ~= TITLE_MARK then
+		return raw, nil
+	end
+	local sep = raw:find(TITLE_MARK, 2, true)
+	if not sep or sep == 2 then
+		return raw, nil
+	end
+	return raw:sub(sep + 1), { bg = raw:sub(2, sep - 1) }
+end
+
+-- set_title only notifies the tab bar when the string changes, so force a change.
+local function paint_tab_title(tab, title)
+	if tab:get_title() == title then
+		tab:set_title(title .. "\u{200b}")
+	end
+	tab:set_title(title)
+end
+
+-- Status bar -----------------------------------------------------------------
+
+local color_hint_parts = {}
+for _, spec in ipairs(TAB_COLORS) do
+	table.insert(color_hint_parts, spec.digit .. spec.key)
+end
+local COLOR_HINT = " " .. table.concat(color_hint_parts, " ") .. "   n random   x clear "
 
 local function current_folder(pane)
 	local uri = pane:get_current_working_dir()
@@ -270,7 +218,8 @@ local function current_folder(pane)
 end
 
 local function render_status(window, pane)
-	if wezterm.GLOBAL.color_hint then
+	local mode = window:active_key_table()
+	if mode == "tab_color" then
 		window:set_right_status(wezterm.format({
 			{ Foreground = { Color = "#7dcfff" } },
 			{ Text = COLOR_HINT },
@@ -282,7 +231,6 @@ local function render_status(window, pane)
 		{ Foreground = { Color = "#737da1" } },
 		{ Text = "  󰉋  " .. current_folder(pane) .. "  " },
 	}
-	local mode = window:active_key_table()
 	if mode then
 		table.insert(elements, { Foreground = { Color = "#bb9af7" } })
 		table.insert(elements, { Attribute = { Intensity = "Bold" } })
@@ -291,72 +239,27 @@ local function render_status(window, pane)
 	window:set_right_status(wezterm.format(elements))
 end
 
-local function paint_tab_title(tab, title)
-	local current = tab:get_title() or ""
-	if current ~= title then
-		tab:set_title(title)
-		return
-	end
-	-- set_title only notifies the tab bar when the string changes.
-	tab:set_title(title .. "\u{200b}")
-	tab:set_title(title)
-end
-
-local function apply_tab_color(window, pane, spec)
-	local tab = window:active_tab()
-	if not tab then
-		return
-	end
-	if spec == "random" then
-		spec = TAB_COLORS[math.random(#TAB_COLORS)]
-	elseif spec == "clear" then
-		spec = nil
-	end
-	local visible = decode_title(tab:get_title())
-	paint_tab_title(tab, encode_title(visible, spec))
-	wezterm.GLOBAL.color_hint = false
-	render_status(window, pane)
-end
-
-local function enter_tab_color(window, pane)
-	window:perform_action(
-		act.ActivateKeyTable({
-			name = "tab_color",
-			timeout_milliseconds = 4000,
-			one_shot = true,
-			replace_current = true,
-			until_unknown = true,
-		}),
-		pane
-	)
-	wezterm.GLOBAL.color_hint = true
-	render_status(window, pane)
-end
+-- Events ---------------------------------------------------------------------
 
 wezterm.on("update-status", function(window, pane)
 	apply_tab_wallpaper(window)
-	if wezterm.GLOBAL.color_hint and window:active_key_table() ~= "tab_color" then
-		wezterm.GLOBAL.color_hint = false
-	end
 	render_status(window, pane)
 end)
 
 wezterm.on("format-tab-title", function(tab, _tabs, _panes, _config, hover, max_width)
 	local visible, spec = decode_title(tab.tab_title)
-	local title = visible
-	if not title or title == "" then
-		title = (tab.active_pane and tab.active_pane.title) or ""
-	end
-	local limit = tonumber(max_width) or 32
+	local title = visible ~= "" and visible or (tab.active_pane and tab.active_pane.title) or ""
 	local index = tostring(tab.tab_index + 1)
 	local chrome_width = 9 + #index
-	title = wezterm.truncate_right(title, math.max(1, limit - chrome_width))
+	title = wezterm.truncate_right(title, math.max(1, (tonumber(max_width) or 32) - chrome_width))
+
 	local background = tab.is_active and "#1a2440" or "#0f1629"
 	if hover and not tab.is_active then
 		background = "#1e2842"
 	end
 	local foreground = tab.is_active and "#c0caf5" or "#737da1"
 	local accent = spec and spec.bg or (tab.is_active and "#7dcfff" or "#39436a")
+
 	return {
 		{ Background = { Color = background } },
 		{ Foreground = { Color = accent } },
@@ -367,62 +270,46 @@ wezterm.on("format-tab-title", function(tab, _tabs, _panes, _config, hover, max_
 	}
 end)
 
+-- Actions --------------------------------------------------------------------
+
+-- spec is a TAB_COLORS entry, "random", or "clear".
 local function color_action(spec)
 	return wezterm.action_callback(function(window, pane)
-		apply_tab_color(window, pane, spec)
+		local tab = window:active_tab()
+		if not tab then
+			return
+		end
+		local chosen = spec
+		if spec == "random" then
+			chosen = TAB_COLORS[math.random(#TAB_COLORS)]
+		elseif spec == "clear" then
+			chosen = nil
+		end
+		local visible = decode_title(tab:get_title())
+		paint_tab_title(tab, encode_title(visible, chosen))
+		render_status(window, pane)
 	end)
 end
 
-local function bind_key(list, key, mods, action)
-	local entry = { key = key, action = action }
-	if mods then
-		entry.mods = mods
-	end
-	table.insert(list, entry)
-end
-
-local color_letter_keys = {}
-local leader_color_keys = {}
-
-local function bind_color_key(list, key, action)
-	bind_key(list, key, nil, action)
-	bind_key(list, key, "CTRL", action)
-	bind_key(list, key, "CTRL|SHIFT", action)
-end
-
-for _, spec in ipairs(TAB_COLORS) do
-	local chosen = spec
-	local action = color_action(chosen)
-	bind_color_key(color_letter_keys, chosen.key, action)
-	bind_color_key(color_letter_keys, chosen.digit, action)
-	bind_key(color_letter_keys, string.upper(chosen.key), "SHIFT", action)
-	bind_key(color_letter_keys, string.upper(chosen.key), "CTRL|SHIFT", action)
-	bind_key(leader_color_keys, chosen.digit, "LEADER", action)
-	bind_key(leader_color_keys, chosen.digit, "LEADER|CTRL", action)
-end
-
-local random_color = color_action("random")
-local clear_color = color_action("clear")
-bind_color_key(color_letter_keys, "n", random_color)
-bind_color_key(color_letter_keys, "x", clear_color)
-bind_key(color_letter_keys, "N", "SHIFT", random_color)
-bind_key(color_letter_keys, "N", "CTRL|SHIFT", random_color)
-bind_key(color_letter_keys, "X", "SHIFT", clear_color)
-bind_key(color_letter_keys, "X", "CTRL|SHIFT", clear_color)
-bind_key(color_letter_keys, "Backspace", nil, clear_color)
-for _, mods in ipairs({ "LEADER", "LEADER|CTRL" }) do
-	bind_key(leader_color_keys, "n", mods, random_color)
-	bind_key(leader_color_keys, "x", mods, clear_color)
-end
+local enter_tab_color = wezterm.action_callback(function(window, pane)
+	window:perform_action(
+		act.ActivateKeyTable({
+			name = "tab_color",
+			timeout_milliseconds = 4000,
+			one_shot = true,
+			replace_current = true,
+			until_unknown = true,
+		}),
+		pane
+	)
+	render_status(window, pane)
+end)
 
 local rename_tab = act.PromptInputLine({
 	description = "Rename tab",
 	action = wezterm.action_callback(function(window, _pane, line)
-		if line == nil then
-			return
-		end
 		local tab = window:active_tab()
-		if not tab then
+		if line == nil or not tab then
 			return
 		end
 		local _, spec = decode_title(tab:get_title())
@@ -430,62 +317,48 @@ local rename_tab = act.PromptInputLine({
 	end),
 })
 
--- keys: Ctrl+Shift for splits (avoids Niri Super bindings)
--- Leader is Ctrl+T. Ctrl+T then R renames the tab and keeps its color.
--- Tab color, immediately: Ctrl+T then a digit, n, or x
---   1 red  2 green  3 blue  4 violet
---   5 yellow  6 orange  7 cyan  8 pink  9 white  0 mint
---   n random  x clear
--- By letter: Ctrl+T then C, then r g b v y o c p w m (same digits work too).
--- Ctrl+Shift+T opens a tab (random wallpaper), then C enters that color mode.
+-- Keys -----------------------------------------------------------------------
+-- Ctrl+Shift is used for pane/tab actions to stay clear of niri's Super binds.
+-- Leader is Ctrl+T; leader binds also accept Ctrl held down (Ctrl+T, Ctrl+R).
+--
+--   Ctrl+T r            rename tab (keeps its color)
+--   Ctrl+T 0-9 / n / x  set tab color / random / clear
+--   Ctrl+T c <key>      color mode: letter or digit from TAB_COLORS, n, x
+--   Ctrl+Shift+T        new tab; press c within 1s to enter color mode
+
+local function bind(list, key, mods, action)
+	table.insert(list, { key = key, mods = mods, action = action })
+end
+
+local function bind_leader(list, key, action)
+	bind(list, key, "LEADER", action)
+	bind(list, key, "LEADER|CTRL", action)
+end
+
+-- Inside the color key table, accept the key with any Ctrl/Shift combination.
+local function bind_color_key(list, key, action)
+	bind(list, key, nil, action)
+	bind(list, key, "CTRL", action)
+	if key:match("%a") then
+		bind(list, key:upper(), "SHIFT", action)
+		bind(list, key:upper(), "CTRL|SHIFT", action)
+	else
+		bind(list, key, "CTRL|SHIFT", action)
+	end
+end
+
 config.leader = { key = "t", mods = "CTRL", timeout_milliseconds = 1000 }
+
 config.keys = {
-	{
-		key = "H",
-		mods = "CTRL|SHIFT",
-		action = act.ActivatePaneDirection("Left"),
-	},
-	{
-		key = "J",
-		mods = "CTRL|SHIFT",
-		action = act.ActivatePaneDirection("Down"),
-	},
-	{
-		key = "K",
-		mods = "CTRL|SHIFT",
-		action = act.ActivatePaneDirection("Up"),
-	},
-	{
-		key = "L",
-		mods = "CTRL|SHIFT",
-		action = act.ActivatePaneDirection("Right"),
-	},
-	{
-		key = "l",
-		mods = "LEADER",
-		action = act.ShowLauncher,
-	},
-	{
-		key = "D",
-		mods = "CTRL|SHIFT",
-		action = act.SplitVertical({ domain = "CurrentPaneDomain" }),
-	},
-	{
-		key = "S",
-		mods = "CTRL|SHIFT",
-		action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }),
-	},
-	-- Ctrl+Shift+X is WezTerm copy mode, so close stays on Q.
-	{
-		key = "Q",
-		mods = "CTRL|SHIFT",
-		action = act.CloseCurrentPane({ confirm = false }),
-	},
-	{
-		key = "A",
-		mods = "CTRL|SHIFT",
-		action = act.SendString("rai\r"),
-	},
+	{ key = "H", mods = "CTRL|SHIFT", action = act.ActivatePaneDirection("Left") },
+	{ key = "J", mods = "CTRL|SHIFT", action = act.ActivatePaneDirection("Down") },
+	{ key = "K", mods = "CTRL|SHIFT", action = act.ActivatePaneDirection("Up") },
+	{ key = "L", mods = "CTRL|SHIFT", action = act.ActivatePaneDirection("Right") },
+	{ key = "D", mods = "CTRL|SHIFT", action = act.SplitVertical({ domain = "CurrentPaneDomain" }) },
+	{ key = "S", mods = "CTRL|SHIFT", action = act.SplitHorizontal({ domain = "CurrentPaneDomain" }) },
+	-- Ctrl+Shift+X is WezTerm's copy mode, so close lives on Q.
+	{ key = "Q", mods = "CTRL|SHIFT", action = act.CloseCurrentPane({ confirm = false }) },
+	{ key = "A", mods = "CTRL|SHIFT", action = act.SendString("rai\r") },
 	{
 		key = "T",
 		mods = "CTRL|SHIFT",
@@ -499,57 +372,37 @@ config.keys = {
 			}),
 		}),
 	},
-	{
-		key = "c",
-		mods = "LEADER",
-		action = wezterm.action_callback(enter_tab_color),
-	},
-	{
-		key = "c",
-		mods = "LEADER|CTRL",
-		action = wezterm.action_callback(enter_tab_color),
-	},
-	{
-		key = "r",
-		mods = "LEADER",
-		action = rename_tab,
-	},
-	{
-		key = "r",
-		mods = "LEADER|CTRL",
-		action = rename_tab,
-	},
+	{ key = "l", mods = "LEADER", action = act.ShowLauncher },
 }
+bind_leader(config.keys, "c", enter_tab_color)
+bind_leader(config.keys, "r", rename_tab)
 
-for _, entry in ipairs(leader_color_keys) do
-	table.insert(config.keys, entry)
+local color_keys = {}
+for _, spec in ipairs(TAB_COLORS) do
+	local action = color_action(spec)
+	bind_color_key(color_keys, spec.key, action)
+	bind_color_key(color_keys, spec.digit, action)
+	bind_leader(config.keys, spec.digit, action)
 end
+
+local random_color = color_action("random")
+local clear_color = color_action("clear")
+bind_color_key(color_keys, "n", random_color)
+bind_color_key(color_keys, "x", clear_color)
+bind(color_keys, "Backspace", nil, clear_color)
+bind_leader(config.keys, "n", random_color)
+bind_leader(config.keys, "x", clear_color)
 
 config.key_tables = {
 	after_new_tab = {
-		{
-			key = "c",
-			action = wezterm.action_callback(enter_tab_color),
-		},
-		{
-			key = "c",
-			mods = "CTRL|SHIFT",
-			action = wezterm.action_callback(enter_tab_color),
-		},
-		{
-			key = "C",
-			mods = "CTRL|SHIFT",
-			action = wezterm.action_callback(enter_tab_color),
-		},
+		{ key = "c", action = enter_tab_color },
+		{ key = "c", mods = "CTRL|SHIFT", action = enter_tab_color },
 	},
-	tab_color = color_letter_keys,
+	tab_color = color_keys,
 }
 
 config.launch_menu = {
-	{
-		label = "dev-ai shell (rai)",
-		args = { "bash", "-ic", "rai" },
-	},
+	{ label = "dev-ai shell (rai)", args = { "bash", "-ic", "rai" } },
 }
 
 return config
